@@ -31,29 +31,62 @@ def object_does_not_exist_handler(request, exc):
         status=404
     )
 
-@api.get("/members", response=List[MemberResponseSchema])
-def list_members(request):
-    # The current tenant schema is already set by django-tenants middleware
-    return Member.objects.all()
-
-@api.post("/members", response=MemberResponseSchema)
-def create_member(request, payload: MemberUpdateSchema):
-    # The current tenant schema is already set by django-tenants middleware
-    member = Member.objects.create(
-        name=payload.name,
-        phone=payload.phone,
-        email=payload.email
-    )
-    return member
-
-@api.get("/members/{member_id}", response=MemberResponseSchema)
+# Internal function for other endpoints to use
 def get_member(request, member_id: int):
     member = Member.objects.get(id=member_id)
     return member
 
-@api.put("/members/{member_id}", response=MemberResponseSchema)
-def update_member(request, member_id: int, payload: MemberUpdateSchema):
-    member = Member.objects.get(id=member_id)
+# Subtenant API endpoints
+@api.get("/members/{subtenant_name}", response=List[MemberResponseSchema])
+def list_members_by_subtenant(request, subtenant_name: str):
+    if subtenant_name.isdigit():
+        # This is a direct member ID access, redirect to the get_member endpoint
+        return get_member(request, int(subtenant_name))
+    
+    if hasattr(request, 'subtenant') and request.subtenant:
+        return Member.objects.filter(subtenant_id=request.subtenant.id)
+    
+    return Member.objects.none()
+
+@api.post("/members/{subtenant_name}", response=MemberResponseSchema)
+def create_member_for_subtenant(request, subtenant_name: str, payload: MemberUpdateSchema):
+    if not hasattr(request, 'subtenant') or not request.subtenant:
+        return api.create_response(
+            request,
+            {"detail": f"Subtenant '{subtenant_name}' not found."},
+            status=404
+        )
+    
+    member = Member.objects.create(
+        name=payload.name,
+        phone=payload.phone,
+        email=payload.email,
+        subtenant_id=request.subtenant.id
+    )
+    return member
+
+@api.get("/members/{subtenant_name}/{member_id}", response=MemberResponseSchema)
+def get_member_from_subtenant(request, subtenant_name: str, member_id: int):
+    if not hasattr(request, 'subtenant') or not request.subtenant:
+        return api.create_response(
+            request,
+            {"detail": f"Subtenant '{subtenant_name}' not found."},
+            status=404
+        )
+    
+    member = Member.objects.get(id=member_id, subtenant_id=request.subtenant.id)
+    return member
+
+@api.put("/members/{subtenant_name}/{member_id}", response=MemberResponseSchema)
+def update_member_for_subtenant(request, subtenant_name: str, member_id: int, payload: MemberUpdateSchema):
+    if not hasattr(request, 'subtenant') or not request.subtenant:
+        return api.create_response(
+            request,
+            {"detail": f"Subtenant '{subtenant_name}' not found."},
+            status=404
+        )
+    
+    member = Member.objects.get(id=member_id, subtenant_id=request.subtenant.id)
     member.name = payload.name
     if payload.phone is not None:
         member.phone = payload.phone
@@ -62,8 +95,15 @@ def update_member(request, member_id: int, payload: MemberUpdateSchema):
     member.save()
     return member
 
-@api.delete("/members/{member_id}", response={200: None})
-def delete_member(request, member_id: int):
-    member = Member.objects.get(id=member_id)
+@api.delete("/members/{subtenant_name}/{member_id}", response={200: None})
+def delete_member_from_subtenant(request, subtenant_name: str, member_id: int):
+    if not hasattr(request, 'subtenant') or not request.subtenant:
+        return api.create_response(
+            request,
+            {"detail": f"Subtenant '{subtenant_name}' not found."},
+            status=404
+        )
+    
+    member = Member.objects.get(id=member_id, subtenant_id=request.subtenant.id)
     member.delete()
     return 200

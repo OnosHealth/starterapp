@@ -13,3 +13,11 @@ class Client(TenantMixin):
 
 class Domain(DomainMixin):
     pass
+
+class SubTenant(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='subtenants')
+    name = models.CharField(max_length=100)  # e.g., 'ny', 'al'
+    created_on = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.client.name}-{self.name}"

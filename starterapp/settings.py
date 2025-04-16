@@ -51,7 +51,7 @@ TENANT_APPS = (
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 MIDDLEWARE = [
-    'django_tenants.middleware.TenantSubfolderMiddleware',
+    'django_tenants.middleware.main.TenantMainMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -59,9 +59,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tenant_app.middleware.SubTenantMiddleware',
 ]
 
 ROOT_URLCONF = 'starterapp.urls'
+PUBLIC_SCHEMA_URLCONF = 'starterapp.urls_public'
 
 TEMPLATES = [
     {
@@ -101,10 +103,8 @@ DATABASE_ROUTERS = (
 )
 
 # Django Tenants Configuration
-TENANT_SUBFOLDER_PREFIX = 'client'
 TENANT_MODEL = 'shared_app.Client'
 TENANT_DOMAIN_MODEL = 'shared_app.Domain'
-PUBLIC_SCHEMA_URLCONF = 'starterapp.urls_public'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
