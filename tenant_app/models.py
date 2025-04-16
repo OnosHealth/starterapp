@@ -1,4 +1,5 @@
 from django.db import models
+from shared_app.models import SubTenant
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
@@ -9,3 +10,22 @@ class Member(models.Model):
     
     def __str__(self):
         return self.name
+        
+    @property
+    def subtenant_name(self):
+        if self.subtenant_id:
+            try:
+                subtenant = SubTenant.objects.get(id=self.subtenant_id)
+                return subtenant.name
+            except SubTenant.DoesNotExist:
+                return None
+        return None
+    
+    @subtenant_name.setter
+    def subtenant_name(self, name):
+        if name:
+            try:
+                subtenant = SubTenant.objects.get(name=name)
+                self.subtenant_id = subtenant.id
+            except SubTenant.DoesNotExist:
+                pass

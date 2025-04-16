@@ -5,6 +5,7 @@ from datetime import datetime
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import connection
+from shared_app.models import SubTenant
 
 api = NinjaAPI(title="Tenant API", urls_namespace="tenant_api")
     
@@ -12,6 +13,7 @@ class MemberUpdateSchema(Schema):
     name: str
     phone: Optional[str] = None
     email: Optional[str] = None
+    subtenant_name: Optional[str] = None
 
 class MemberResponseSchema(Schema):
     id: int
@@ -19,6 +21,7 @@ class MemberResponseSchema(Schema):
     phone: Optional[str] = None
     email: Optional[str] = None
     created_at: datetime
+    subtenant_name: Optional[str] = None
 
 class ErrorSchema(Schema):
     detail: str
@@ -57,11 +60,20 @@ def create_member_for_subtenant(request, subtenant_name: str, payload: MemberUpd
             status=404
         )
     
+    # Use provided subtenant_name if available, otherwise use the one from the URL
+    subtenant_id = request.subtenant.id
+    if payload.subtenant_name:
+        try:
+            subtenant = SubTenant.objects.get(name=payload.subtenant_name, client=request.subtenant.client)
+            subtenant_id = subtenant.id
+        except SubTenant.DoesNotExist:
+            pass
+    
     member = Member.objects.create(
         name=payload.name,
         phone=payload.phone,
         email=payload.email,
-        subtenant_id=request.subtenant.id
+        subtenant_id=subtenant_id
     )
     return member
 
@@ -92,6 +104,15 @@ def update_member_for_subtenant(request, subtenant_name: str, member_id: int, pa
         member.phone = payload.phone
     if payload.email is not None:
         member.email = payload.email
+    
+    # Update subtenant if provided
+    if payload.subtenant_name:
+        try:
+            subtenant = SubTenant.objects.get(name=payload.subtenant_name, client=request.subtenant.client)
+            member.subtenant_id = subtenant.id
+        except SubTenant.DoesNotExist:
+            pass
+            
     member.save()
     return member
 
